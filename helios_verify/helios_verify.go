@@ -31,6 +31,7 @@ func main() {
 	var download = flag.Bool("download", true, "Whether or not to download the bundle")
 	var verify = flag.Bool("verify", false, "Whether or not to verify the downloaded bundle")
 	var write = flag.Bool("write", true, "Whether or not to write the downloaded bundle to a file")
+
 	flag.Parse()
 
 	if len(*electionUuid) == 0 {

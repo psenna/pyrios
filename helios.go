@@ -26,14 +26,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/psenna/isup-http-client/isuphttp"
 )
 
 // A Question is part of an Election and specifies a question to be voted on.
@@ -626,28 +627,32 @@ func (vote *Ballot) ExtractResult(e *Election) Result {
 // quotes from big integers). This is necessary to get big.Int to unmarshal the
 // values from JSON as big integers.
 func GetJSON(addr string, v interface{}) ([]byte, error) {
-	var err error
-	var jsonData []byte
-	resp, err := http.Get(addr)
-	if err != nil {
-		glog.Errorf("Could not get data from the Helios server: %s\n", err)
-		return nil, err
+	session := os.Getenv("HELIOS_SESSION")
+
+	request := isuphttp.GetHTTPRequest("GET", addr).SetTimeOut(100000)
+
+	client := isuphttp.HTTPClient{}
+
+	if session != "" {
+		request = request.SetHeaders(map[string]interface{}{
+			"Cookie": "sessionid=" + session,
+		})
 	}
 
-	defer resp.Body.Close()
-	jsonData, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Couldn't read the body of the response: %s\n", err)
-		return nil, err
+	response := client.HTTPCall(request)
+
+	if response.Error != "" {
+		glog.Errorf("Could not get data from the Helios server: %s\n", response.Error)
+		return nil, errors.New(response.Error)
 	}
 
-	err = UnmarshalJSON(jsonData, v)
+	err := UnmarshalJSON([]byte(response.Body), v)
 	if err != nil {
 		glog.Errorf("Could not unmarshal the Helios data: %s\n", err)
 		return nil, err
 	}
 
-	return jsonData, err
+	return []byte(response.Body), err
 }
 
 // The regular expression used to fix bigIntegers in UnmarshalJSON.
